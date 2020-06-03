@@ -1,5 +1,8 @@
 const SocketIO = require('socket.io');
 const axios = require('axios');
+const cookieParser = require('cookie-parser');
+const cookie = require('cookie-signature');
+require('dotenv').config();
 
 module.exports = (server, app, sessionMiddleware) => {
   const io = SocketIO(server, { path: '/socket.io' });
@@ -8,6 +11,9 @@ module.exports = (server, app, sessionMiddleware) => {
   const room = io.of('/room');
   const chat = io.of('/chat');
 
+  io.use((socket, next) => {
+    cookieParser(process.env.COOKIE_SECRET)(socket.request, socket.request.res, next);
+  });
   io.use((socket, next) => {
     sessionMiddleware(socket.request, socket.request.res, next);
   });
@@ -26,11 +32,21 @@ module.exports = (server, app, sessionMiddleware) => {
       headers: { referer },
     } = req;
     const roomId = referer.split('/')[referer.split('/').length - 1].replace(/\?.+/, '');
-    socket.join(roomId);
-    socket.to(roomId).emit('join', {
-      user: 'system',
-      chat: `${req.session.color}님이 입장하셨습니다.`,
-    });
+    socket.join(roomId); // 방에 접속
+
+    axios.post(
+      `http://localhost:8005/room/${roomId}/sys`,
+      {
+        type: 'join',
+      },
+      {
+        headers: {
+          Cookie: `connect.sid=${
+            's%3A' + cookie.sign(req.signedCookies['connect.sid'], process.env.COOKIE_SECRET)
+          }`,
+        },
+      }
+    );
     socket.on('disconnect', () => {
       console.log('chat 네임스페이스 접속 해제');
       socket.leave(roomId);
@@ -46,10 +62,19 @@ module.exports = (server, app, sessionMiddleware) => {
             console.error(error);
           });
       } else {
-        socket.to(roomId).emit('exit', {
-          user: 'system',
-          chat: `${req.session.color}님이 퇴장하셨습니다.`,
-        });
+        axios.post(
+          `http://localhost:8005/room/${roomId}/sys`,
+          {
+            type: 'exit',
+          },
+          {
+            headers: {
+              Cookie: `connect.sid=${
+                's%3A' + cookie.sign(req.signedCookies['connect.sid'], process.env.COOKIE_SECRET)
+              }`,
+            },
+          }
+        );
       }
     });
   });
