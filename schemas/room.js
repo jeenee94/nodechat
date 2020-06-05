@@ -19,7 +19,7 @@ const roomSchema = new Schema({
   password: String,
   createdAt: {
     type: Date,
-    default: Date.now,
+    default: Date.now() + 3600000 * 9,
   },
 });
 

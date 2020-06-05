@@ -5,7 +5,12 @@ block content
   a#exit-btn(href='/') 방 나가기
   #number
     | 참여자 수:
-    #number-count= number
+    span#number-count= number
+    | /
+    span#number-max= room.max
+  #owner
+    | 방장: 
+    span#room-owner(style='color:' + room.owner)= room.owner
   fieldset
     legend 채팅 내용
     #chat-list
@@ -64,6 +69,15 @@ block content
       }
       var name = document.createElement('div');
       name.textContent = data.user;
+      name.className = 'chat-user';
+      if (data.user !== '#{user}') {
+        var dm = document.createElement('button');
+        dm.textContent = '귓속말';
+        dm.className = 'dm';
+        dm.dataset.socket = data.socket;
+        dm.addEventListener('click', sendDM);
+        name.appendChild(dm);
+      }
       div.appendChild(name);
       if (data.chat) {
         var chat = document.createElement('div');
@@ -90,7 +104,7 @@ block content
         };
         xhr.open('POST', '/room/#{room._id}/chat');
         xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.send(JSON.stringify({ chat: this.chat.value }));
+        xhr.send(JSON.stringify({ chat: this.chat.value, sid: socket.id }));
       }
     });
     document.querySelector('#gif').addEventListener('change', function (e) {
@@ -107,4 +121,15 @@ block content
       };
       xhr.open('POST', '/room/#{room._id}/gif');
       xhr.send(formData);
+    });
+    var sendDM = function (e) {
+      var id = e.target.dataset.socket;
+      var prompt = window.prompt('귓속말을 입력하세요.');
+      socket.emit('dm', { target: id, msg: prompt, from: '#{user}'});
+    };
+    Array.prototype.forEach.call(document.querySelectorAll('.dm'), function(el) {
+      el.addEventListener('click', sendDM);
+    });
+    socket.on('dm', function (data) {
+      alert(data.from + '님에게서 귓속말이 도착했습니다. \n' + data.msg);
     });
